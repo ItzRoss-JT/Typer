@@ -1,0 +1,109 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+@import './styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family:
+      'Inter',
+      system-ui,
+      -apple-system,
+      Segoe UI,
+      Roboto,
+      sans-serif;
+    font-feature-settings:
+      'cv11',
+      'ss01',
+      'ss03';
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Display headings get tight tracking per §8.2 */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.03em;
+    font-weight: 600;
+  }
+
+  /* Respect prefers-reduced-motion globally (§8.5) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-bg),
+      0 0 0 5px var(--color-brand-300);
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  /*
+   * Hero atmosphere — layered radial gradients on the warm off-white base.
+   * Lives in the body of /dashboard and /onboarding. Subtle enough that
+   * text contrast stays WCAG-safe.
+   */
+  .bg-warm-mesh {
+    background-color: var(--color-bg);
+    background-image:
+      radial-gradient(at 18% 12%, rgba(255, 163, 114, 0.28) 0px, transparent 50%),
+      radial-gradient(at 82% 8%, rgba(45, 212, 191, 0.18) 0px, transparent 50%),
+      radial-gradient(at 76% 92%, rgba(242, 92, 22, 0.15) 0px, transparent 55%);
+  }
+
+  /* Faint grain — adds depth on hero surfaces, very low opacity. */
+  .bg-grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.7'/></svg>");
+  }
+
+  /* Card primitive */
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-elevated {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    box-shadow: var(--shadow-elevated);
+  }
+}

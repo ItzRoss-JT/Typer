@@ -1,0 +1,68 @@
+/*
+ * Design tokens. Reference these via CSS variables or Tailwind theme
+ * extensions. Never hardcode hex values in components.
+ * Spec sources: §8.1 (color), §8.4 (shadows).
+ */
+:root {
+  /* Brand — warm orange anchors the playful "energy" tone */
+  --color-brand-50: #fff4ed;
+  --color-brand-100: #ffe5d3;
+  --color-brand-200: #ffc7a6;
+  --color-brand-300: #ffa372;
+  --color-brand-400: #ff7e3e;
+  --color-brand-500: #f25c16; /* primary */
+  --color-brand-600: #d44509;
+  --color-brand-700: #af3508;
+  --color-brand-800: #8b2a09;
+  --color-brand-900: #6e230c;
+
+  /* Accent — cool teal for "correct/success" contrast against brand orange */
+  --color-accent-400: #2dd4bf;
+  --color-accent-500: #14b8a6;
+  --color-accent-600: #0d9488;
+
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-error: #ef4444;
+
+  /* Neutral surfaces */
+  --color-bg: #fffbf7;
+  --color-surface: #ffffff;
+  --color-elevated: #fff8f1;
+  --color-border: #f0e5d8;
+  --color-text: #1c1917;
+  --color-text-muted: #78716c;
+  --color-text-dim: #a8a29e;
+
+  /* Finger zones — color-coded per finger (used on keyboard) */
+  --finger-L-pinky: #ec4899;
+  --finger-L-ring: #a855f7;
+  --finger-L-middle: #3b82f6;
+  --finger-L-index: #06b6d4;
+  --finger-R-index: #14b8a6;
+  --finger-R-middle: #22c55e;
+  --finger-R-ring: #eab308;
+  --finger-R-pinky: #f97316;
+  --finger-thumb: #94a3b8;
+
+  /* Layered tinted shadows (§8.4). Never use flat shadow-md. */
+  --shadow-card:
+    0 1px 2px rgba(242, 92, 22, 0.06),
+    0 4px 12px rgba(242, 92, 22, 0.08);
+  --shadow-elevated:
+    0 2px 4px rgba(242, 92, 22, 0.08),
+    0 12px 32px rgba(242, 92, 22, 0.12);
+  --shadow-glow: 0 0 0 4px rgba(242, 92, 22, 0.15);
+}
+
+/* Reserved structure for dark mode (defer to v1.1 per §8.1) */
+[data-theme='dark'] {
+  --color-bg: #1c1917;
+  --color-surface: #292524;
+  --color-elevated: #44403c;
+  --color-border: #57534e;
+  --color-text: #fafaf9;
+  --color-text-muted: #a8a29e;
+  --color-text-dim: #78716c;
+}
