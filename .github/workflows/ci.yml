@@ -42,10 +42,12 @@ jobs:
         run: npm run build
 
       - name: Verify dist hygiene
-        # No source maps and no live console.log/debug/info should ship to prod.
-        # (A literal "console.log" string lives inside src/data/codeSnippets.ts —
-        # that's content the user TYPES in code mode, not executed code, so we
-        # only fail if it shows up as an actual call.)
+        # We rely on Vite's esbuild `pure` option to strip real
+        # console.log/debug/info CALLS from the production bundle. The
+        # only legitimate matches that remain are STRING LITERALS inside
+        # src/data/codeSnippets.ts — content the user TYPES in code mode,
+        # not executed code. Those bundle into the CodeMode-<hash>.js
+        # chunk, which we exclude from the scan.
         run: |
           set -e
           if find dist -name "*.map" | grep -q .; then
@@ -53,11 +55,12 @@ jobs:
             find dist -name "*.map"
             exit 1
           fi
-          if grep -rE "console\.(log|debug|info)\(" dist/assets/*.js \
-              | grep -v "codeSnippets" \
-              | grep -q .; then
+          # `|| true` so the pipeline doesn't fail when grep finds zero matches.
+          offenders=$(grep -lE "console\.(log|debug|info)\(" dist/assets/*.js 2>/dev/null \
+            | grep -Ev "/CodeMode-[^/]*\.js$" || true)
+          if [ -n "$offenders" ]; then
             echo "::error::Live console.log/debug/info found in prod bundle"
-            grep -rnE "console\.(log|debug|info)\(" dist/assets/*.js | grep -v codeSnippets
+            echo "$offenders"
             exit 1
           fi
           echo "dist hygiene OK"
