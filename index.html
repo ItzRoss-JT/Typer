@@ -7,6 +7,18 @@
     <meta name="theme-color" content="#F25C16" />
     <title>Typer — Touch Typing Trainer</title>
     <meta name="description" content="A gamified, evidence-based touch typing trainer. Accuracy first, daily and small, with adaptive drills for your weak spots." />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="robots" content="index, follow" />
+    <!--
+      Content Security Policy — strict, default-deny.
+      Style 'unsafe-inline' is required because Recharts and React inline style attributes
+      are governed by style-src; no script 'unsafe-inline' or 'unsafe-eval' is allowed.
+      frame-ancestors / X-Frame-Options can only be set via HTTP header — see vercel.json.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+    />
   </head>
   <body>
     <div id="root"></div>

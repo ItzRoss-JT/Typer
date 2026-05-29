@@ -1,13 +1,21 @@
 /*
- * Typed wrapper around idb-keyval with schema migrations.
- * Schema versions are stored on the persisted object itself; on load we run
- * any pending migration before handing the object to the rest of the app.
+ * Typed wrapper around idb-keyval with schema migrations and Zod validation.
  *
- * Two top-level keys today: 'progress' and 'settings'. Long history archives
- * spill into 'progress-archive-{n}' per spec §13.
+ * IndexedDB is editable by anyone with the user's browser (DevTools → Storage).
+ * That's acceptable for personal stats, but reads still need to be validated:
+ * a malformed object should not crash the app, leak prototype keys, or be
+ * trusted as-is. The flow is:
+ *
+ *   raw idb-keyval read
+ *     → migrateX (defensive merging that adds new fields)
+ *     → Zod parse (rejects anything still off-shape)
+ *     → on failure: fall back to defaults and log a warning
+ *
+ * Long history archives spill into 'progress-archive-{n}' per spec §13.
  */
 import { get, set } from 'idb-keyval';
 import type { UserProgress, UserSettings } from '../types';
+import { UserProgressSchema, UserSettingsSchema } from './schemas';
 
 export const CURRENT_PROGRESS_SCHEMA = 1;
 export const CURRENT_SETTINGS_SCHEMA = 1;
@@ -78,7 +86,17 @@ function migrateSettings(raw: unknown): UserSettings {
 export async function loadProgress(): Promise<UserProgress> {
   try {
     const raw = await get(KEY_PROGRESS);
-    return migrateProgress(raw);
+    const migrated = migrateProgress(raw);
+    const parsed = UserProgressSchema.safeParse(migrated);
+    if (!parsed.success) {
+      // Stored data is corrupt or tampered. Don't crash and don't trust it —
+      // fall back to defaults. The user keeps the app usable; the bad data
+      // stays on disk until they choose to reset (so we don't silently
+      // destroy anything that might be recoverable manually).
+      console.warn('[db] progress failed validation, using defaults:', parsed.error.issues[0]);
+      return defaultProgress();
+    }
+    return parsed.data;
   } catch (err) {
     // IndexedDB unavailable (private mode etc.) — start fresh in-memory.
     console.warn('[db] loadProgress fell back to defaults:', err);
@@ -109,7 +127,13 @@ async function nextArchiveIndex(): Promise<number> {
 export async function loadSettings(): Promise<UserSettings> {
   try {
     const raw = await get(KEY_SETTINGS);
-    return migrateSettings(raw);
+    const migrated = migrateSettings(raw);
+    const parsed = UserSettingsSchema.safeParse(migrated);
+    if (!parsed.success) {
+      console.warn('[db] settings failed validation, using defaults:', parsed.error.issues[0]);
+      return defaultSettings();
+    }
+    return parsed.data;
   } catch (err) {
     console.warn('[db] loadSettings fell back to defaults:', err);
     return defaultSettings();

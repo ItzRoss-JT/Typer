@@ -1,9 +1,31 @@
 node_modules/
 dist/
 .DS_Store
+
+# Environment / secrets — never commit any of these.
 .env
 .env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+*.pem
+*.key
+*.p12
+*.pfx
+
 .vite/
 coverage/
 temporary screenshots/
 *.log
+
+# Vercel CLI state
+.vercel/
+
+# TypeScript / Vite build artifacts
+*.tsbuildinfo
+
+# Editor metadata
+.idea/
+.vscode/
+!.vscode/extensions.json

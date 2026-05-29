@@ -1,22 +1,32 @@
 /*
- * JSON export/import for backup and migration. Writes a single bundle file
- * with both progress and settings.
+ * JSON export/import for backup and migration.
+ *
+ * SECURITY: imports are an attack vector — the user can hand us a file the
+ * app then persists. The flow is two-step:
+ *
+ *   1. parseAndValidateImport(file) — reads, size-caps, JSON-parses, runs the
+ *      Zod schema, returns a typed Bundle + a summary. Throws on any failure.
+ *   2. applyImport(bundle)         — the UI calls this AFTER the user confirms
+ *      in the modal, only then do we touch IndexedDB.
+ *
+ * Never call applyImport without the user explicitly confirming the summary.
  */
 import { loadProgress, loadSettings, saveProgress, saveSettings } from './db';
-import type { UserProgress, UserSettings } from '../types';
-
-interface Bundle {
-  app: 'typer';
-  exportedAt: number;
-  progress: UserProgress;
-  settings: UserSettings;
-}
+import {
+  BundleSchema,
+  CURRENT_DATA_INTEGRITY_VERSION,
+  IMPORT_MAX_BYTES,
+  summarizeBundle,
+  type Bundle,
+  type BundleSummary,
+} from './schemas';
 
 export async function exportToFile(): Promise<void> {
   const [progress, settings] = await Promise.all([loadProgress(), loadSettings()]);
   const bundle: Bundle = {
     app: 'typer',
     exportedAt: Date.now(),
+    dataIntegrityVersion: CURRENT_DATA_INTEGRITY_VERSION,
     progress,
     settings,
   };
@@ -31,25 +41,59 @@ export async function exportToFile(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-/** Validates a parsed JSON bundle. Throws with a user-friendly message on failure. */
-function assertBundle(raw: unknown): asserts raw is Bundle {
-  if (!raw || typeof raw !== 'object') throw new Error('File is not valid JSON.');
-  // `r` is `any`-typed at the boundary — we're doing the validation here. // any-justified: untyped JSON
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const r = raw as any;
-  if (r.app !== 'typer') throw new Error('Not a Typer backup file.');
-  if (!r.progress || !r.settings) throw new Error('Missing progress or settings.');
+export interface ParsedImport {
+  bundle: Bundle;
+  summary: BundleSummary;
 }
 
-export async function importFromFile(file: File): Promise<void> {
-  const text = await file.text();
+/**
+ * Step 1 of import: size-cap, parse, validate. Never writes to storage.
+ * Throws a user-friendly Error on any failure (caller surfaces the message).
+ */
+export async function parseAndValidateImport(file: File): Promise<ParsedImport> {
+  // Size check BEFORE reading into memory beyond a header. `file.size` is
+  // populated by the browser without a full read.
+  if (file.size > IMPORT_MAX_BYTES) {
+    const mb = (IMPORT_MAX_BYTES / 1024 / 1024).toFixed(1);
+    throw new Error(`File is too large (max ${mb} MB).`);
+  }
+
+  let text: string;
+  try {
+    text = await file.text();
+  } catch {
+    throw new Error('Could not read file.');
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
     throw new Error('File is not valid JSON.');
   }
-  assertBundle(parsed);
-  await saveProgress(parsed.progress);
-  await saveSettings(parsed.settings);
+
+  const result = BundleSchema.safeParse(parsed);
+  if (!result.success) {
+    // Surface the first issue path/message — enough to debug, not so much it
+    // becomes a leakage vector.
+    const first = result.error.issues[0];
+    const where = first?.path?.join('.') || '<root>';
+    throw new Error(`Backup file is invalid: ${first?.message ?? 'unknown'} at ${where}`);
+  }
+
+  return { bundle: result.data, summary: summarizeBundle(result.data) };
+}
+
+/**
+ * Step 2 of import: persist the already-validated bundle. The UI MUST gate
+ * this behind explicit user confirmation (the import-confirm modal).
+ */
+export async function applyImport(bundle: Bundle): Promise<void> {
+  // Defensive re-parse in case the caller mutated the object between steps.
+  const result = BundleSchema.safeParse(bundle);
+  if (!result.success) {
+    throw new Error('Refused to apply: bundle failed re-validation.');
+  }
+  await saveProgress(result.data.progress);
+  await saveSettings(result.data.settings);
 }

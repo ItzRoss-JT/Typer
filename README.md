@@ -8,6 +8,12 @@ Read [PROJECT_INSTRUCTIONS.md](./PROJECT_INSTRUCTIONS.md) for the full spec,
 [CLAUDE.md](./CLAUDE.md) for the workflow rules, and [CHANGES.md](./CHANGES.md)
 for the design decisions made during the build.
 
+[`SECURITY.md`](./SECURITY.md) covers the threat model, what is hardened
+today (CSP, security headers, JSON-import validation, build hygiene), and
+forward-looking guidance for when LLM and account features ship.
+[`PRIVACY.md`](./PRIVACY.md) covers what we collect (nothing) and what
+stays in your browser.
+
 ## What it does
 
 - **Guided lessons** — 33 lessons across 9 units, gated by accuracy (default 95%)
@@ -38,6 +44,7 @@ Other scripts:
 | `npm run preview` | Vite's built-in preview of `dist/` on port 4173. |
 | `node serve.mjs` | Custom static server for `dist/` on **port 3000** with SPA fallback. |
 | `npm run lint` | ESLint over `src/` and `tests/`. |
+| `npm run security:audit` | `npm audit --audit-level=high` — fail on High/Critical findings. |
 | `node screenshot.mjs http://localhost:5173 [label]` | Save a full-page screenshot. |
 
 ## Deploy to Vercel

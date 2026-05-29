@@ -31,7 +31,8 @@ export function applyPracticeSession(
   // It's a new day. Were the prior minutes enough to keep the streak going?
   // We need yesterday's count to be already-credited in `current` (we credit
   // immediately on hitting threshold), so today we just figure out continuity.
-  let { current, longest, lastPracticedDate } = streak;
+  let { current, longest } = streak;
+  const { lastPracticedDate } = streak;
   const yesterday = addDays(today, -1);
 
   if (compareDates(lastPracticedDate, yesterday) === 0) {
@@ -48,7 +49,7 @@ export function applyPracticeSession(
   }
 
   // Today's bucket starts fresh.
-  let todayMinutes = addedMinutes;
+  const todayMinutes = addedMinutes;
   let creditedNewDay = false;
   if (todayMinutes >= threshold) {
     current += 1;

@@ -10,10 +10,15 @@ import { Toggle } from '../components/ui/Toggle';
 import { Modal } from '../components/ui/Modal';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useProgressStore } from '../store/useProgressStore';
-import { exportToFile, importFromFile } from '../lib/exportImport';
+import {
+  applyImport,
+  exportToFile,
+  parseAndValidateImport,
+  type ParsedImport,
+} from '../lib/exportImport';
 import { defaultProgress, defaultSettings, resetAll } from '../lib/db';
 import type { UserSettings } from '../types';
-import { Download, Trash2, Upload } from 'lucide-react';
+import { Download, ShieldAlert, Trash2, Upload } from 'lucide-react';
 
 const GOAL_OPTIONS = [5, 10, 15, 30] as const;
 const PRACTICE_DURATIONS: UserSettings['defaultPracticeSeconds'][] = [15, 30, 60, 120];
@@ -28,6 +33,8 @@ export default function Settings() {
   const [resetWord, setResetWord] = useState('');
   const [importErr, setImportErr] = useState<string | null>(null);
   const [importOk, setImportOk] = useState(false);
+  const [pendingImport, setPendingImport] = useState<ParsedImport | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
 
   return (
     <div className="space-y-8">
@@ -151,11 +158,10 @@ export default function Settings() {
                 setImportErr(null);
                 setImportOk(false);
                 try {
-                  await importFromFile(f);
-                  // Reload progress into the store immediately.
-                  const { loadProgress } = await import('../lib/db');
-                  replaceProgress(await loadProgress());
-                  setImportOk(true);
+                  // Step 1 of two-step import: parse + validate only. Storage
+                  // is not touched until the user confirms the summary modal.
+                  const parsed = await parseAndValidateImport(f);
+                  setPendingImport(parsed);
                 } catch (err) {
                   setImportErr(err instanceof Error ? err.message : 'Import failed.');
                 }
@@ -180,6 +186,58 @@ export default function Settings() {
           </Button>
         </Row>
       </Section>
+
+      <Modal
+        open={pendingImport !== null}
+        onClose={() => {
+          if (importBusy) return;
+          setPendingImport(null);
+        }}
+        title="Confirm import"
+      >
+        {pendingImport ? (
+          <ImportConfirmBody parsed={pendingImport} />
+        ) : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={importBusy}
+            onClick={() => setPendingImport(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={importBusy || pendingImport === null}
+            onClick={async () => {
+              if (!pendingImport) return;
+              setImportBusy(true);
+              setImportErr(null);
+              try {
+                await applyImport(pendingImport.bundle);
+                const { loadProgress, loadSettings } = await import('../lib/db');
+                const [nextProgress, nextSettings] = await Promise.all([
+                  loadProgress(),
+                  loadSettings(),
+                ]);
+                replaceProgress(nextProgress);
+                update(nextSettings);
+                setImportOk(true);
+                setPendingImport(null);
+              } catch (err) {
+                setImportErr(err instanceof Error ? err.message : 'Import failed.');
+                setPendingImport(null);
+              } finally {
+                setImportBusy(false);
+              }
+            }}
+          >
+            {importBusy ? 'Replacing…' : 'Replace my data'}
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         open={resetOpen}
@@ -248,6 +306,56 @@ function Row({
       </div>
       <div>{children}</div>
     </div>
+  );
+}
+
+function ImportConfirmBody({ parsed }: { parsed: ParsedImport }) {
+  const s = parsed.summary;
+  const fmtDate = (ms: number | null) =>
+    ms === null ? '—' : new Date(ms).toLocaleDateString(undefined, { dateStyle: 'medium' });
+  const range =
+    s.earliestSessionAt && s.latestSessionAt && s.earliestSessionAt !== s.latestSessionAt
+      ? `${fmtDate(s.earliestSessionAt)} → ${fmtDate(s.latestSessionAt)}`
+      : fmtDate(s.earliestSessionAt);
+
+  const stats: Array<[string, string]> = [
+    ['Exported on', fmtDate(s.exportedAt)],
+    ['Sessions', s.sessionCount.toLocaleString()],
+    ['Date range', range],
+    ['Lessons cleared', s.lessonsCleared.toLocaleString()],
+    ['Badges earned', s.badges.toLocaleString()],
+    ['Total keystrokes', s.totalKeystrokes.toLocaleString()],
+  ];
+
+  return (
+    <>
+      <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-ink">
+        <ShieldAlert
+          size={16}
+          className="mt-0.5 shrink-0 text-warning"
+          aria-hidden="true"
+        />
+        <p>
+          This will <strong>replace</strong> your current progress and settings. We
+          can't undo this — export a fresh backup first if you might want to come
+          back to today's data.
+        </p>
+      </div>
+
+      <dl className="mt-4 divide-y divide-border overflow-hidden rounded-lg border border-border bg-elevated">
+        {stats.map(([label, value]) => (
+          <div
+            key={label}
+            className="flex items-baseline justify-between gap-4 px-4 py-2.5"
+          >
+            <dt className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
+              {label}
+            </dt>
+            <dd className="font-mono text-sm tabular-nums text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </>
   );
 }
 
