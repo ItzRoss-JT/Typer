@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, test, audit, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Matches package.json "engines": { "node": ">=20.0.0" }
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run engine tests
+        run: npm test
+
+      - name: Security audit
+        run: npm run security:audit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify dist hygiene
+        # No source maps and no live console.log/debug/info should ship to prod.
+        # (A literal "console.log" string lives inside src/data/codeSnippets.ts —
+        # that's content the user TYPES in code mode, not executed code, so we
+        # only fail if it shows up as an actual call.)
+        run: |
+          set -e
+          if find dist -name "*.map" | grep -q .; then
+            echo "::error::Source maps found in dist/ — vite.config.ts must set build.sourcemap=false"
+            find dist -name "*.map"
+            exit 1
+          fi
+          if grep -rE "console\.(log|debug|info)\(" dist/assets/*.js \
+              | grep -v "codeSnippets" \
+              | grep -q .; then
+            echo "::error::Live console.log/debug/info found in prod bundle"
+            grep -rnE "console\.(log|debug|info)\(" dist/assets/*.js | grep -v codeSnippets
+            exit 1
+          fi
+          echo "dist hygiene OK"
